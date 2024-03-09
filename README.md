@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # zyxy
 
 #### 介绍
@@ -35,3 +36,6 @@
 4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
 5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
 6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+=======
+# 只因寻友 伙伴匹配项目
+>>>>>>> 0dc52f3 (initial state)
