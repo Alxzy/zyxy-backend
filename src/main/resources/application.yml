@@ -8,6 +8,13 @@ spring:
     url: jdbc:mysql://localhost:13306/yupi
     username: root
     password: xzy
+  # 更改 springMVC 配置适配 Swagger 接口文档
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  # 指定环境
+  profiles:
+    active: dev
   # session 失效时间
   session:
     timeout: 86400
