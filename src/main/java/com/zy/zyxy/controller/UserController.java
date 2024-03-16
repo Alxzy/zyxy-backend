@@ -10,10 +10,12 @@ import com.zy.zyxy.model.domain.request.UserLoginRequest;
 import com.zy.zyxy.model.domain.request.UserRegisterRequest;
 import com.zy.zyxy.service.UserService;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,6 +30,7 @@ import static com.zy.zyxy.contant.UserConstant.USER_LOGIN_STATE;
  */
 @RestController
 @RequestMapping("/user")
+@CrossOrigin(origins = {"http://localhost:5173/"})
 public class UserController {
 
     @Resource
@@ -116,7 +119,7 @@ public class UserController {
 
     @GetMapping("/search")
     public BaseResponse<List<User>> searchUsers(String username, HttpServletRequest request) {
-        if (!isAdmin(request)) {
+        if (!userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH, "缺少管理员权限");
         }
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
@@ -130,7 +133,7 @@ public class UserController {
 
     @PostMapping("/delete")
     public BaseResponse<Boolean> deleteUser(@RequestBody long id, HttpServletRequest request) {
-        if (!isAdmin(request)) {
+        if (!userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH);
         }
         if (id <= 0) {
@@ -140,18 +143,38 @@ public class UserController {
         return ResultUtils.success(b);
     }
 
-
     /**
-     * 是否为管理员
-     *
-     * @param request
+     * 根据标签列表搜索用户列表
+     * @param tagsList 标签列表
      * @return
      */
-    private boolean isAdmin(HttpServletRequest request) {
-        // 仅管理员可查询
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User user = (User) userObj;
-        return user != null && user.getUserRole() == ADMIN_ROLE;
+    @GetMapping("/search/tags")
+    private BaseResponse<List<User>> searchUsersByTags(@RequestParam(required = false) List<String> tagsList){
+        //校验
+        if(CollectionUtils.isEmpty(tagsList)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"参数为空");
+        }
+        // 调用方法
+        List<User> users = userService.searchUsersByTags(tagsList);
+
+        return ResultUtils.success(users);
     }
+
+    @PutMapping ("/update")
+    public BaseResponse<Boolean> updateUserById(@RequestBody User user, HttpServletRequest request) {
+        // 参数校验
+        if(user == null || user.getId() <= 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = userService.updateUser(user,request);
+        return ResultUtils.success(result);
+    }
+
+
+
+
+
+
+
 
 }
