@@ -13,6 +13,11 @@ public interface UserConstant {
      */
     String USER_LOGIN_STATE = "userLoginState";
 
+    /**
+     * 用户个性化推荐 Redis缓存键
+     */
+    String USER_RECOMMEND_KEY = "zyxy:user:recommed:%s";
+
     //  ------- 权限 --------
 
     /**

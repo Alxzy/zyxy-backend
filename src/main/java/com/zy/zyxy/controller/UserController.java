@@ -1,6 +1,7 @@
 package com.zy.zyxy.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zy.zyxy.common.BaseResponse;
 import com.zy.zyxy.common.ErrorCode;
 import com.zy.zyxy.common.ResultUtils;
@@ -9,7 +10,10 @@ import com.zy.zyxy.model.dto.User;
 import com.zy.zyxy.model.domain.request.UserLoginRequest;
 import com.zy.zyxy.model.domain.request.UserRegisterRequest;
 import com.zy.zyxy.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,10 +21,10 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.zy.zyxy.contant.UserConstant.ADMIN_ROLE;
-import static com.zy.zyxy.contant.UserConstant.USER_LOGIN_STATE;
+import static com.zy.zyxy.contant.UserConstant.*;
 
 /**
  * 用户接口
@@ -30,11 +34,15 @@ import static com.zy.zyxy.contant.UserConstant.USER_LOGIN_STATE;
  */
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = {"http://localhost:5173/"})
+@CrossOrigin(origins = {"http://localhost:5173/"},allowCredentials = "true")
+@Slf4j
 public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private RedisTemplate redisTemplate;
 
     /**
      * 用户注册
@@ -131,6 +139,8 @@ public class UserController {
         return ResultUtils.success(list);
     }
 
+
+
     @PostMapping("/delete")
     public BaseResponse<Boolean> deleteUser(@RequestBody long id, HttpServletRequest request) {
         if (!userService.isAdmin(request)) {
@@ -158,6 +168,56 @@ public class UserController {
         List<User> users = userService.searchUsersByTags(tagsList);
 
         return ResultUtils.success(users);
+    }
+
+    /**
+     * 根据登录用户个性化推荐
+     * @param current
+     * @param pagesize
+     * @param request
+     * @return
+     */
+    @GetMapping("/recommend")
+    private BaseResponse<Page<User>> recommendUsers(Long current,Long pagesize,HttpServletRequest request){
+        // todo 个性化推荐算法
+        // 获取登录状态 个性化 推荐
+        // 1.权限校验
+        User loginUser = userService.getLoginUser(request);
+        // 生成 对应用户的 key
+        String userRedisKey = String.format(USER_RECOMMEND_KEY, loginUser.getId());
+
+
+        // 2.从缓存中获取数据
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        Page<User> userPage = ( Page<User>) valueOperations.get(userRedisKey);
+        // 缓存不为空 直接返回
+        if(userPage != null){
+            return ResultUtils.success(userPage);
+        }
+        // 3.从数据库中查询
+
+        // 分页
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+//        List<User> userList = userService.list(queryWrapper);
+
+        if(current == null){
+            current = 1l;
+        }
+        if(pagesize == null){
+            pagesize = 15l;
+        }
+        userPage = userService.page(new Page<>(current, pagesize), queryWrapper);
+        // 修改为安全用户
+        List<User> list = userPage.getRecords().stream().map(user -> userService.getSafetyUser(user)).collect(Collectors.toList());
+        userPage.setRecords(list);
+        // 加载到Redis中
+        // 设置过期时间为30s
+        try {
+            valueOperations.set(userRedisKey,userPage,30000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.error("redis set key error : " + userRedisKey,e);
+        }
+        return ResultUtils.success(userPage);
     }
 
     @PutMapping ("/update")
