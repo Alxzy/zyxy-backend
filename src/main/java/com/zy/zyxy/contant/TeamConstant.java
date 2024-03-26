@@ -9,8 +9,10 @@ package com.zy.zyxy.contant;
 public interface TeamConstant {
 
     /**
-     * 管理员权限
+     * 用户最大队伍数量
      */
     int DEFAULT_MAX_TEAM_NUM = 5;
+
+
 
 }

@@ -1,25 +1,19 @@
-package com.zy.zyxy.model.domain.request;
+package com.zy.zyxy.model.vo;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.zy.zyxy.common.PageRequest;
 import lombok.Data;
 
 import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 队伍
+ * 队伍+用户视图
  * @TableName team
  */
-@TableName(value ="team")
 @Data
-public class TeamQueryRequest extends PageRequest implements Serializable {
+public class TeamUserVO implements Serializable {
 
 
-    /**
-     * 队长id
-     */
-    private Long createId;
 
     /**
      * 队伍最大人数
@@ -41,6 +35,7 @@ public class TeamQueryRequest extends PageRequest implements Serializable {
      */
     private String description;
 
+
     /**
      * 超时时间
      */
@@ -52,13 +47,8 @@ public class TeamQueryRequest extends PageRequest implements Serializable {
     private Date createTime;
 
     /**
-     * 搜索关键词
+     * 队长用户视图
      */
-    private String searchText;
-
-
-    private static final long serialVersionUID = 1L;
-
-
+    private UserVO createUserVO;
 
 }

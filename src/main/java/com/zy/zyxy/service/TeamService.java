@@ -1,9 +1,14 @@
 package com.zy.zyxy.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zy.zyxy.model.domain.request.TeamQueryRequest;
 import com.zy.zyxy.model.dto.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.zy.zyxy.model.dto.User;
+import com.zy.zyxy.model.vo.TeamUserVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
 * @author Administrator
@@ -18,4 +23,20 @@ public interface TeamService extends IService<Team> {
      * @param request
      */
     long createTeam(Team team, HttpServletRequest request);
+
+    /**
+     * 根据查询请求查询队伍以及队长信息
+     * @param teamQueryRequest
+     * @return
+     */
+    List<TeamUserVO> listTeams(TeamQueryRequest teamQueryRequest,HttpServletRequest request);
+
+    /**
+     * 添加用户到对应队伍
+     * @param teamId
+     * @param loginUser
+     * @param password
+     * @return
+     */
+    boolean joinTeam(Long teamId, User loginUser, String password);
 }
