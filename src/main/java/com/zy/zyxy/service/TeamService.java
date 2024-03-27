@@ -29,7 +29,7 @@ public interface TeamService extends IService<Team> {
      * @param teamQueryRequest
      * @return
      */
-    List<TeamUserVO> listTeams(TeamQueryRequest teamQueryRequest,HttpServletRequest request);
+    List<TeamUserVO> listTeams(TeamQueryRequest teamQueryRequest,HttpServletRequest request,boolean isMe);
 
     /**
      * 添加用户到对应队伍
@@ -39,4 +39,22 @@ public interface TeamService extends IService<Team> {
      * @return
      */
     boolean joinTeam(Long teamId, User loginUser, String password);
+
+    /**
+     * 用户退出队伍
+     * @param teamId
+     * @param loginUser
+     * @return
+     */
+    boolean quitTeam(Long teamId, User loginUser);
+
+    /**
+     * 队长解散队伍
+     * @param teamId
+     * @param loginUser
+     * @return
+     */
+    boolean removeTeam(Long teamId, User loginUser);
+
+
 }

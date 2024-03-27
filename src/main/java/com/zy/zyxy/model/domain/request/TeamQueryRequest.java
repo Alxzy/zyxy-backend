@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 队伍
@@ -15,6 +16,10 @@ import java.util.Date;
 @Data
 public class TeamQueryRequest extends PageRequest implements Serializable {
 
+    /**
+     * id列表
+     */
+    private List<Long> idList;
 
     /**
      * 队长id

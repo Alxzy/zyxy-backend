@@ -116,7 +116,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     }
 
     @Override
-    public List<TeamUserVO> listTeams(TeamQueryRequest teamQueryRequest,HttpServletRequest request) {
+    public List<TeamUserVO> listTeams(TeamQueryRequest teamQueryRequest,HttpServletRequest request,boolean isMe) {
         Team team = new Team();
         BeanUtils.copyProperties(teamQueryRequest, team);
         // 1.属性复制
@@ -124,11 +124,15 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         team.setName(null);
         team.setDescription(null);
         // 2.权限校验：只有管理员可以查询 非公开和加密房间
-        if(!userService.isAdmin(request)){
+        if(!userService.isAdmin(request) && !isMe){
             team.setStatus(TeamStatusEnum.PUBLIC.getValue());
         }
-        // 3.参数校验 不展示过期队伍
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>(team);
+        List<Long> idList = teamQueryRequest.getIdList();
+        if (isMe && CollectionUtils.isNotEmpty(idList)) {
+            queryWrapper.in("id", idList);
+        }
+        // 3.参数校验 不展示过期队伍
         queryWrapper.and(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
         // 4.拼接 OR 子句 关键字 模糊查询
         String searchText = Optional.ofNullable(teamQueryRequest.getSearchText()).orElse("");
@@ -162,18 +166,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     @Override
     public boolean joinTeam(Long teamId, User loginUser, String password) {
+        // todo 还有一个逆天的问题,就是校验完后准备添加前队伍被删了,小概率事件
         // 参数校验
-        if(teamId == null || teamId < 0){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍错误");
-        }
-
-        // team相关校验
-        // 1.队伍存在
-        Team team = this.getById(teamId);
-
-        if(team == null){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍不存在");
-        }
+        Team team = isExistTeam(teamId);
         Integer maxPeopleNum = team.getPeopleNum();
         // 2.队伍不为私密状态
         TeamStatusEnum statusEnum = TeamStatusEnum.getEnumByValue(team.getStatus());
@@ -181,7 +176,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.NO_AUTH,"无法加入该队伍");
         }
         // 3.队伍未过期
-        if(team.getExpireTime().before(new Date())){
+        if(isTeamExpire(teamId)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已过期");
         }
         // 4.队伍加密必须密码匹配
@@ -225,6 +220,111 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         userTeam.setJoinTime(new Date());
         return userTeamService.save(userTeam);
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean quitTeam(Long teamId, User loginUser) {
+        // 参数校验
+        // 1.队伍是否存在
+        isExistTeam(teamId);
+        // 2.是否加入队伍
+        Long userId = loginUser.getId();
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("teamId",teamId);
+        // 3.队伍未过期
+        if(isTeamExpire(teamId)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已过期");
+        }
+        //获取队伍当前人数
+        long currentPeople = userTeamService.count(userTeamQueryWrapper);
+        userTeamQueryWrapper.eq("userId",userId);
+        long count = userTeamService.count(userTeamQueryWrapper);
+        if(count < 1){
+            throw new BusinessException(ErrorCode.NO_AUTH,"用户不能退出未加入的队伍");
+        }
+        // 4.获取队伍当前人数
+        if(currentPeople <= 1){
+            // 删除队伍
+            this.removeById(teamId);
+        }else{
+            // 还有其他人
+            // 4.1 如果队长退出 转移给第二早加入的队伍
+            if(isCreateUser(teamId,userId)){
+                QueryWrapper<UserTeam> queryWrapper = new QueryWrapper<UserTeam>();
+                queryWrapper.eq("teamId",teamId);
+                queryWrapper.last("order by id asc limit 2");
+                List<UserTeam> userTeamList = userTeamService.list(queryWrapper);
+                UserTeam userTeam = userTeamList.get(1);
+                Long newCreateUserId = userTeam.getUserId();
+                // 更新当前队伍队长
+                Team team = new Team();
+                team.setCreateId(newCreateUserId);
+                team.setId(teamId);
+                boolean result = this.updateById(team);
+                if (!result) {
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新队伍队长失败");
+                }
+            }
+            // 4.2 非队长 退出即可
+        }
+        return userTeamService.remove(userTeamQueryWrapper);
+    }
+
+    @Override
+    public boolean removeTeam(Long teamId, User loginUser) {
+        // todo 解散队伍和加入队伍 并发问题
+        // 参数校验
+        // 1.队伍是否存在 后面方法里已经有了
+//        isExistTeam(teamId);
+        // 2.检查是否为队长
+        Long userId = loginUser.getId();
+        if(!isCreateUser(teamId,userId)){
+            throw new BusinessException(ErrorCode.NO_AUTH,"只有队长用户可以解散队伍");
+        }
+        // 3.队伍未过期
+        if(isTeamExpire(teamId)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已过期");
+        }
+        // 4. 移除关联信息,再删除队伍
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("teamId", teamId);
+        boolean result = userTeamService.remove(userTeamQueryWrapper);
+        if (!result) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "删除队伍关联信息失败");
+        }
+        // 删除队伍
+        return this.removeById(teamId);
+    }
+
+    private Team isExistTeam(Long teamId) {
+        if(teamId == null || teamId < 0){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍错误");
+        }
+        Team team = this.getById(teamId);
+        if(team == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍不存在");
+        }
+
+        return team;
+    }
+
+
+    private Boolean isTeamExpire(Long teamId){
+        Team team = this.isExistTeam(teamId);
+        // 3.队伍未过期
+        if(team.getExpireTime().before(new Date())){
+            return Boolean.TRUE;
+        }
+        return Boolean.FALSE;
+    }
+
+    private Boolean isCreateUser(Long teamId,Long userId){
+        Team team = this.isExistTeam(teamId);
+        Long createId = team.getCreateId();
+        return createId.equals(userId);
+    }
+
+
 }
 
 

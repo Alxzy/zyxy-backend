@@ -1,5 +1,7 @@
 package com.zy.zyxy.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.zy.zyxy.model.dto.Team;
 import com.zy.zyxy.model.dto.UserTeam;
 import com.baomidou.mybatisplus.extension.service.IService;
 
