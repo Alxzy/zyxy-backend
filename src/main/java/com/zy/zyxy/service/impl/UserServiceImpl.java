@@ -2,6 +2,7 @@ package com.zy.zyxy.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -10,6 +11,8 @@ import com.zy.zyxy.exception.BusinessException;
 import com.zy.zyxy.model.dto.User;
 import com.zy.zyxy.service.UserService;
 import com.zy.zyxy.mapper.UserMapper;
+import com.zy.zyxy.util.AlgorithmUtils;
+import javafx.util.Pair;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -17,10 +20,7 @@ import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -68,8 +68,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (userPassword.length() < 8 || checkPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
         }
-        if (planetCode.length() > 5) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "星球编号过长");
+        if (planetCode.length() > 10) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户分组过长");
         }
         // 账户不能包含特殊字符
         String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
@@ -88,12 +88,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (count > 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
         }
-        // 星球编号不能重复
+        // 星球编号必须合法
         queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("planetCode", planetCode);
         count = userMapper.selectCount(queryWrapper);
-        if (count > 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "编号重复");
+        if (count <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "无相同圈子的伙伴,请重新填写圈子");
         }
         // 2. 加密
         String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
@@ -125,16 +125,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         if (userAccount.length() < 4) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"账户长度过短");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账户长度过短");
         }
         if (userPassword.length() < 8) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"密码长度过短");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码长度过短");
         }
         // 账户不能包含特殊字符
         String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
         Matcher matcher = Pattern.compile(validPattern).matcher(userAccount);
         if (matcher.find()) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"账户中不能包含特殊字符");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账户中不能包含特殊字符");
         }
         // 2. 加密
         String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
@@ -215,6 +215,77 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return user;
     }
 
+    @Override
+    public Page<User> matchUser(User loginUser, Long num) {
+        // 检验是否有标签
+        String tags = loginUser.getTags();
+        Gson gson = new Gson();
+        List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
+        }.getType());
+        if (tagList == null || tagList.size() == 0) {
+            return matchUserNoTag(loginUser,num);
+        }
+        // 1.筛选标签不为空的
+        // todo 给用户添加一个字段区分 planetCode
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.eq("planetCode",loginUser.getPlanetCode());
+        userQueryWrapper.isNotNull("tags");
+
+        List<User> userList = this.list(userQueryWrapper);
+        // 查不出东西直接报错
+        if(userList == null || userList.size() == 0){
+            throw new BusinessException(ErrorCode.NULL_ERROR);
+        }
+
+        // 用户列表的下表 => 相似度
+        // 2.遍历用户计算相似度 键为用户,值为编辑距离
+        List<Pair<User, Long>> list = new ArrayList<>();
+        for (User user : userList) {
+            String currentUsertags = user.getTags();
+            // 用户不能为自己或者无标签  (Long类型请使用equals())
+            if (StringUtils.isBlank(currentUsertags) || user.getId().equals(loginUser.getId())) {
+                continue;
+            }
+            List<String> currentTagList = gson.fromJson(currentUsertags, new TypeToken<List<String>>() {
+            }.getType());
+            long minDistance = AlgorithmUtils.minDistance(tagList, currentTagList);
+            list.add(new Pair(user, minDistance));
+        }
+        // 3.获取前 num 小的编辑距离的用户 分页返回
+        // 3.1 按照编辑距离排序
+        List<Pair<User, Long>> topNumUserList = list.stream()
+                .sorted((o1, o2) -> (int) (o1.getValue() - o2.getValue()))
+                .limit(num)
+                .collect(Collectors.toList());
+        // 3.2 获取对应的用户id列表
+        List<Long> idList = topNumUserList.stream().map(pair -> pair.getKey().getId()).collect(Collectors.toList());
+
+        // 3.3 再次查询补充完整信息并分页
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.in("id",idList);
+        Page<User> userPage = this.page(new Page<>(1, num), queryWrapper);
+        Map<Long, List<User>> userListMap = userPage.getRecords().stream()
+                .map(user -> this.getSafetyUser(user))
+                .collect(Collectors.groupingBy(User::getId));
+        List<User> finalUserList = new ArrayList<>();
+        for (Long id : idList) {
+            finalUserList.add(userListMap.get(id).get(0));
+        }
+        return userPage.setRecords(finalUserList);
+    }
+
+    //todo 无标签随机推荐
+    private Page<User> matchUserNoTag(User loginUser,Long num) {
+//        throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前用户无标签");
+      // 直接查找前 num 条 相同圈子的
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.eq("planetCode",loginUser.getPlanetCode());
+        Page<User> userPage = this.page(new Page<>(1, num), userQueryWrapper);
+        List<User> safeUserList = userPage.getRecords().stream().map(user -> getSafetyUser(user)).collect(Collectors.toList());
+        return userPage.setRecords(safeUserList);
+    }
+
+
     /**
      * 用户注销
      *
@@ -287,7 +358,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             Set<String> tagNameSet = Optional.ofNullable(tempTagNameSet).orElse(new HashSet<>());
             // 2.4 判断是否包含每一个标签
             for (String tagName : tagNameList) {
-                if(!tagNameSet.contains(tagName)){
+                if (!tagNameSet.contains(tagName)) {
                     return false;
                 }
             }
@@ -300,24 +371,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Override
     public boolean updateUser(User user, HttpServletRequest request) {
         // 参数校验
-        if(user == null || user.getId() <= 0){
+        if (user == null || user.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         // 权限校验
         // 1.必须登录
         // 2.必须是管理员或者自己才能修改
         User loginUser = getLoginUser(request);
-        if(loginUser == null){
+        if (loginUser == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
-        if(!isAdmin(loginUser) && loginUser.getId() != user.getId()){
+        if (!isAdmin(loginUser) && loginUser.getId() != user.getId()) {
             throw new BusinessException(ErrorCode.NO_AUTH);
+        }
+        // 3.修改的星球编号必须存在  管理员可以无视这条规则修改
+        String planetCode = user.getPlanetCode();
+        if(!isAdmin(loginUser) && StringUtils.isNotEmpty(planetCode)){
+            // 星球编号必须合法
+            QueryWrapper queryWrapper = new QueryWrapper<User>();
+            queryWrapper.eq("planetCode", planetCode);
+            long count = userMapper.selectCount(queryWrapper);
+            if (count <= 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "无相同圈子的伙伴,请重新填写圈子");
+            }
         }
 
         // 数据库中是否存在
         Long updatedUserId = user.getId();
         User oldUser = userMapper.selectById(user.getId());
-        if(oldUser == null){
+        if (oldUser == null) {
             throw new BusinessException(ErrorCode.NULL_ERROR);
         }
         // 修改

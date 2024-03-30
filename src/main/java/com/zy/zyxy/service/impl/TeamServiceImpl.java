@@ -125,7 +125,11 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         team.setDescription(null);
         // 2.权限校验：只有管理员可以查询 非公开和加密房间
         if(!userService.isAdmin(request) && !isMe){
-            team.setStatus(TeamStatusEnum.PUBLIC.getValue());
+            if(TeamStatusEnum.PRIVATE.equals(TeamStatusEnum.getEnumByValue(team.getStatus()))){
+                throw new BusinessException(ErrorCode.NO_AUTH,"普通用户不可访问私密房间");
+            }
+            // 加密也可以查好了
+//            team.setStatus(TeamStatusEnum.PUBLIC.getValue());
         }
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>(team);
         List<Long> idList = teamQueryRequest.getIdList();
@@ -271,6 +275,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean removeTeam(Long teamId, User loginUser) {
         // todo 解散队伍和加入队伍 并发问题
         // 参数校验

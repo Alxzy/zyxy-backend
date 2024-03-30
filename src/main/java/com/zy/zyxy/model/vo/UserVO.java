@@ -13,6 +13,8 @@ import java.util.Date;
 @Data
 public class UserVO implements Serializable {
 
+    private Long id;
+
     /**
      * 用户昵称
      */

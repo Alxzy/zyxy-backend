@@ -1,5 +1,6 @@
 package com.zy.zyxy.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zy.zyxy.model.dto.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -80,4 +81,12 @@ public interface UserService extends IService<User> {
      * @return
      */
     User getLoginUser(HttpServletRequest request);
+
+    /**
+     * 根据当前用户匹配用户
+     * @param loginUser
+     * @param num
+     * @return
+     */
+    Page<User> matchUser(User loginUser, Long num);
 }

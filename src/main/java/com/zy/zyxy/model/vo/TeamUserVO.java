@@ -1,6 +1,5 @@
 package com.zy.zyxy.model.vo;
 
-import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -14,6 +13,15 @@ import java.util.Date;
 public class TeamUserVO implements Serializable {
 
 
+    /**
+     * id
+     */
+    private Long id;
+
+    /**
+     * 创建者id
+     */
+    private Long createId;
 
     /**
      * 队伍最大人数
@@ -43,6 +51,7 @@ public class TeamUserVO implements Serializable {
 
     /**
      * 创建时间
+     *
      */
     private Date createTime;
 

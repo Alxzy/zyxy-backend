@@ -170,7 +170,7 @@ public class TeamController {
         return ResultUtils.success(result);
     }
 
-    @DeleteMapping("/delete")
+    @PostMapping("/delete")
     @AuthCheck(anyRole = {"admin","user","vip"})
     public BaseResponse<Boolean> removeMyTeam(@RequestBody TeamQuitRequest teamQuitRequest, HttpServletRequest request){
         if(teamQuitRequest == null){

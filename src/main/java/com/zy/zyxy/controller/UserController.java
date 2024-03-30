@@ -2,6 +2,7 @@ package com.zy.zyxy.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zy.zyxy.annotation.AuthCheck;
 import com.zy.zyxy.common.BaseResponse;
 import com.zy.zyxy.common.ErrorCode;
 import com.zy.zyxy.common.ResultUtils;
@@ -221,6 +222,7 @@ public class UserController {
     }
 
     @PutMapping ("/update")
+    @AuthCheck(anyRole = {"admin","user","vip"})
     public BaseResponse<Boolean> updateUserById(@RequestBody User user, HttpServletRequest request) {
         // 参数校验
         if(user == null || user.getId() <= 0){
@@ -228,6 +230,22 @@ public class UserController {
         }
         boolean result = userService.updateUser(user,request);
         return ResultUtils.success(result);
+    }
+
+    @GetMapping("/match")
+    @AuthCheck(anyRole = {"admin","user","vip"})
+    public BaseResponse<Page<User>> matchUser(Long num,HttpServletRequest request) {
+        // 校验参数是否合理
+        if(num == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        if(num <= 0 || num > 20){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"匹配用户过多");
+        }
+        // 取出登录用户
+        User loginUser = userService.getLoginUser(request);
+        Page<User> userList = userService.matchUser(loginUser,num);
+        return ResultUtils.success(userList);
     }
 
 
