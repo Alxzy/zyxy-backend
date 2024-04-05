@@ -3,6 +3,7 @@ package com.zy.zyxy.model.domain.request;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 用户注册请求体
@@ -34,6 +35,37 @@ public class UserRegisterRequest implements Serializable {
      * 星球编号
      */
     private String planetCode;
+
+    /**
+     * 电话
+     */
+    private String phone;
+
+    /**
+     * 邮箱
+     */
+    private String email;
+
+    /**
+     * 标签列表
+     */
+    private String tags;
+
+    /**
+     * 用户头像
+     */
+    private String avatarUrl;
+
+    /**
+     * 性别
+     */
+    private Integer gender;
+
+    /**
+     * 用户昵称
+     */
+    private String username;
+
 }
 
 // 

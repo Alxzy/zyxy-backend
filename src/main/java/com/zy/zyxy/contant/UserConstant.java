@@ -18,7 +18,15 @@ public interface UserConstant {
      */
     String USER_RECOMMEND_KEY = "zyxy:user:recommed:%s";
 
-    //  ------- 权限 --------
+    /**
+     * 用户个性化匹配 Redis缓存键
+     */
+    String USER_MATCH_KEY = "zyxy:user:match:%s";
+
+    /**
+     * 添加队伍 用户锁
+     */
+    String USER_JOIN_TEAM_USER_KEY = "zyxy:join:team:user:%s";
 
     /**
      * 默认权限

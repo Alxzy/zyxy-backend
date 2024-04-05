@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -61,10 +60,16 @@ public class UserController {
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
         String planetCode = userRegisterRequest.getPlanetCode();
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode)) {
-            return null;
+        String phone = userRegisterRequest.getPhone();
+        String email = userRegisterRequest.getEmail();
+        String activeIds = userRegisterRequest.getTags();
+        String avatarUrl = userRegisterRequest.getAvatarUrl();
+        Integer gender = userRegisterRequest.getGender();
+        String userName = userRegisterRequest.getUsername();
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode,phone,email,activeIds,userName)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode);
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode,phone,email,gender,avatarUrl,activeIds,userName);
         return ResultUtils.success(result);
     }
 
@@ -124,7 +129,6 @@ public class UserController {
         return ResultUtils.success(safetyUser);
     }
 
-    // https://zy.icu/
 
     @GetMapping("/search")
     public BaseResponse<List<User>> searchUsers(String username, HttpServletRequest request) {
@@ -160,13 +164,16 @@ public class UserController {
      * @return
      */
     @GetMapping("/search/tags")
-    private BaseResponse<List<User>> searchUsersByTags(@RequestParam(required = false) List<String> tagsList){
+    @AuthCheck(anyRole = {"admin","user","vip"})
+    public BaseResponse<List<User>> searchUsersByTags(@RequestParam(required = false) List<String> tagsList,HttpServletRequest request){
         //校验
         if(CollectionUtils.isEmpty(tagsList)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"参数为空");
         }
+        // 获取登录用户
+        User loginUser = userService.getLoginUser(request);
         // 调用方法
-        List<User> users = userService.searchUsersByTags(tagsList);
+        List<User> users = userService.searchUsersByTags(tagsList,loginUser);
 
         return ResultUtils.success(users);
     }
@@ -179,11 +186,19 @@ public class UserController {
      * @return
      */
     @GetMapping("/recommend")
-    private BaseResponse<Page<User>> recommendUsers(Long current,Long pagesize,HttpServletRequest request){
+    @AuthCheck(anyRole = {"admin","user","vip"})
+    public BaseResponse<Page<User>> recommendUsers(Long current,Long pagesize,HttpServletRequest request){
         // todo 个性化推荐算法
         // 获取登录状态 个性化 推荐
+        // 0.参数合理
+        if(pagesize != null && pagesize > 50){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
         // 1.权限校验
         User loginUser = userService.getLoginUser(request);
+        if(loginUser == null){
+            throw new BusinessException(ErrorCode.NOT_LOGIN);
+        }
         // 生成 对应用户的 key
         String userRedisKey = String.format(USER_RECOMMEND_KEY, loginUser.getId());
 
@@ -235,17 +250,34 @@ public class UserController {
     @GetMapping("/match")
     @AuthCheck(anyRole = {"admin","user","vip"})
     public BaseResponse<Page<User>> matchUser(Long num,HttpServletRequest request) {
-        // 校验参数是否合理
+        // 1.校验参数是否合理
         if(num == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         if(num <= 0 || num > 20){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"匹配用户过多");
         }
+        // 2.取缓存
         // 取出登录用户
         User loginUser = userService.getLoginUser(request);
-        Page<User> userList = userService.matchUser(loginUser,num);
-        return ResultUtils.success(userList);
+        // 生成 对应用户的 key
+        String userRedisKey = String.format(USER_MATCH_KEY, loginUser.getId());
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        Page<User> userPage = (Page<User>) valueOperations.get(userRedisKey);
+        // 缓存不为空 直接返回
+        if(userPage != null){
+            return ResultUtils.success(userPage);
+        }
+        // 3.无缓存,查询数据库
+        userPage = userService.matchUser(loginUser,num);
+        // 4.加载到Redis中
+        // 设置过期时间为60s
+        try {
+            valueOperations.set(userRedisKey,userPage,60000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.error("redis set key error : " + userRedisKey,e);
+        }
+        return ResultUtils.success(userPage);
     }
 
 

@@ -57,7 +57,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return 新用户 id
      */
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode,String phone,String email,Integer gender,String avatarUrl,String activeIds,String userName) {
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
@@ -68,14 +68,36 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (userPassword.length() < 8 || checkPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
         }
+        if(userName.length() == 0 || userName.length() > 50){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户名不合法");
+        }
         if (planetCode.length() > 10) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户分组过长");
+        }
+        // todo 校验传入的标签必须在 星球编号内
+        if(activeIds.length() > 200){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户标签不合法");
+        }
+        if(avatarUrl.length() > 200){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户头像地址过长");
+        }
+        // 校验手机号
+        //校验手机号（正则表达式）
+        if (!phone.matches("1[3-9]\\d{9}")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"手机号格式有误");
+        }
+        // 校验邮箱
+        if (!email.matches("\\w{1,30}@[a-zA-Z0-9]{2,20}(\\.[a-zA-Z0-9]{2,20}){1,2}")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"邮箱不合法");
         }
         // 账户不能包含特殊字符
         String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
         Matcher matcher = Pattern.compile(validPattern).matcher(userAccount);
         if (matcher.find()) {
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"账号不能包含特殊字符");
+        }
+        if(gender < 0 || gender > 1){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"性别不合法");
         }
         // 密码和校验密码相同
         if (!userPassword.equals(checkPassword)) {
@@ -102,9 +124,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
         user.setPlanetCode(planetCode);
+        user.setEmail(email);
+        user.setGender(gender);
+        user.setTags(activeIds);
+        user.setPhone(phone);
+        user.setAvatarUrl(avatarUrl);
+        user.setUsername(userName);
+
         boolean saveResult = this.save(user);
         if (!saveResult) {
-            return -1;
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR);
         }
         return user.getId();
     }
@@ -326,10 +355,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * 根据标签搜索用户(内存)
      *
      * @param tagNameList 标签列表
+     * @param loginUser 登录用户
      * @return 脱敏后的用户列表
      */
     @Override
-    public List<User> searchUsersByTags(List<String> tagNameList) {
+    public List<User> searchUsersByTags(List<String> tagNameList,User loginUser) {
         // 1.参数校验 非空
         if (CollectionUtils.isEmpty(tagNameList)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -341,8 +371,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 //        for (String tagName : tagNameList) {
 //            userQueryWrapper = userQueryWrapper.like("tags", tagName);
 //        }
-        // 1.查询所有用户
+        // 1.查询当前星球(模块)部分用户
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        String planetCode = loginUser.getPlanetCode();
+        if(StringUtils.isAnyBlank(planetCode)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        userQueryWrapper.eq("planetCode", planetCode);
         List<User> userList = userMapper.selectList(userQueryWrapper);
         Gson gson = new Gson();
         // 2.判断内存中的用户列表是否有包含要求的标签
@@ -381,7 +416,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (loginUser == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN);
         }
-        if (!isAdmin(loginUser) && loginUser.getId() != user.getId()) {
+        if (!isAdmin(loginUser) && !loginUser.getId().equals(user.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH);
         }
         // 3.修改的星球编号必须存在  管理员可以无视这条规则修改
@@ -396,6 +431,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
         }
 
+        //校验手机号（正则表达式）
+        if (user.getPhone() != null && !user.getPhone().matches("1[3-9]\\d{9}")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"手机号格式有误");
+        }
+        // 校验邮箱
+        if (user.getEmail() != null && !user.getEmail().matches("\\w{1,30}@[a-zA-Z0-9]{2,20}(\\.[a-zA-Z0-9]{2,20}){1,2}")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"邮箱不合法");
+        }
+        // 头像
+        if(user.getAvatarUrl() != null && user.getAvatarUrl().length() > 200){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户头像地址过长");
+        }
+
+        // 校验性别
+        if(user.getGender() != null && (user.getGender() < 0 || user.getGender() > 1)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"性别不合法");
+        }
         // 数据库中是否存在
         Long updatedUserId = user.getId();
         User oldUser = userMapper.selectById(user.getId());

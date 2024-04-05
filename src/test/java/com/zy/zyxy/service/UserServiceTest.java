@@ -92,7 +92,7 @@ public class UserServiceTest {
         String userPassword = "12345678";
         String checkPassword = "12345678";
         String planetCode = "10";
-        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode);
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode,"","",0,"","");
         Assertions.assertEquals(11, result);
 //        userAccount = "yu";
 //        result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode);
@@ -124,7 +124,7 @@ public class UserServiceTest {
     @Test
     void searchUsersByTags() {
         List<String> list = Arrays.asList("java", "python");
-        List<User> users = userService.searchUsersByTags(list);
+        List<User> users = userService.searchUsersByTags(list,new User());
         for (User user : users) {
             System.out.println("查询到的用户有：" + user.toString());
         }

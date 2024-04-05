@@ -24,7 +24,7 @@ public interface UserService extends IService<User> {
      * @param planetCode    星球编号
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode);
+    long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode,String phone,String email,Integer gender,String avatarUrl,String activeIds,String userName);
 
     /**
      * 用户登录
@@ -56,9 +56,10 @@ public interface UserService extends IService<User> {
     /**
      * 根据标签搜索用户
      * @param tagNameList 标签列表
+     * @param loginUser 登录用户
      * @return 脱敏后的用户列表
      */
-    List<User> searchUsersByTags(List<String> tagNameList);
+    List<User> searchUsersByTags(List<String> tagNameList,User loginUser);
 
     /**
      * 根据用户id修改用户信息
