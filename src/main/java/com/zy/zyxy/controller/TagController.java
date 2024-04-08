@@ -18,6 +18,8 @@ import com.zy.zyxy.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,7 +27,11 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static com.zy.zyxy.contant.TagConstant.TAG_CATEGORY_KEY;
+import static com.zy.zyxy.contant.TagConstant.TAG_LIST_KEY;
 
 /**
  * @author Administrator
@@ -43,6 +49,9 @@ public class TagController {
 
     @Resource
     private TagService tagService;
+
+    @Resource
+    private RedisTemplate redisTemplate;
 
     @PostMapping("/add")
     @AuthCheck(mustRole = "admin")
@@ -85,7 +94,7 @@ public class TagController {
      */
     @GetMapping("/get")
     @AuthCheck(anyRole = {"admin", "user", "vip"})
-    public BaseResponse<Tag> getTeamById(long id) {
+    public BaseResponse<Tag> getTagById(long id) {
         // todo 权限校验
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -133,22 +142,44 @@ public class TagController {
         }
         Tag tag = new Tag();
         BeanUtils.copyProperties(tagQueryRequest, tag);
+
         User loginUser = userService.getLoginUser(request);
         // 未登录
         if (loginUser != null) {
             String planetCode = loginUser.getPlanetCode();
             tag.setCategory(planetCode);
         }
+        String category = tag.getCategory();
+        // 普通用户只能按照标签分组查找
+        if(StringUtils.isBlank(category) && !userService.isAdmin(request)){
+            throw new BusinessException(ErrorCode.NO_AUTH);
+        }
+        // 1.查找缓存
+        String tagDataKey = String.format(TAG_LIST_KEY, category);
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        List<TagVO> tagVOList = (List<TagVO>) valueOperations.get(tagDataKey);
+        if(tagVOList != null){
+            return ResultUtils.success(tagVOList);
+        }
+        // 2.查找数据库
 
         // 只能查询子标签
         tag.setIsParent(0);
         QueryWrapper<Tag> tagQueryWrapper = new QueryWrapper<>(tag);
         List<Tag> tagList = tagService.list(tagQueryWrapper);
-        List<TagVO> tagVOList = tagList.stream().map(tag1 -> {
+        tagVOList = tagList.stream().map(tag1 -> {
             TagVO tagVO = new TagVO();
             BeanUtils.copyProperties(tag1, tagVO);
             return tagVO;
         }).collect(Collectors.toList());
+        // 3.重建缓存
+        // 加载到Redis中
+        // 设置过期时间为24h
+        try {
+            valueOperations.set(tagDataKey,tagVOList,24, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.error("redis set key error : " + tagDataKey,e);
+        }
         return ResultUtils.success(tagVOList);
     }
 
@@ -160,13 +191,28 @@ public class TagController {
     @GetMapping("/get/category")
     public BaseResponse<List<String>> getTagCategory() {
         // 1.获取标签列表
-        // todo Redis缓存 和 定时任务更新缓存
+        // 1.1 缓存中获取
+        String tagCategoryKey = TAG_CATEGORY_KEY;
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        List<String> resultList = (List<String>) valueOperations.get(tagCategoryKey);
+        if(resultList != null){
+            return ResultUtils.success(resultList);
+        }
+        // 1.2 数据库中获取
         List<Tag> tagList = tagService.list();
         if (tagList == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR);
         }
-        List<String> resultList = tagList.stream()
+        resultList = tagList.stream()
                 .map(tag -> tag.getCategory()).distinct().collect(Collectors.toList());
+        // 1.3 重建缓存
+        // 加载到Redis中
+        // 设置过期时间为24h
+        try {
+            valueOperations.set(tagCategoryKey,resultList,24, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.error("redis set key error : " + tagCategoryKey,e);
+        }
         return ResultUtils.success(resultList);
     }
 }

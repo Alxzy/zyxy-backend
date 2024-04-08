@@ -56,5 +56,10 @@ public interface TeamService extends IService<Team> {
      */
     boolean removeTeam(Long teamId, User loginUser);
 
-
+    /**
+     * 根据数据扩充 队伍-用户列表 计算并添加其他属性
+     * @param resultList
+     * @return
+     */
+    List<TeamUserVO> getResultTeamVOList(List<TeamUserVO> resultList,HttpServletRequest request);
 }

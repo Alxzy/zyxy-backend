@@ -141,32 +141,10 @@ public class TeamController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         List<TeamUserVO> resultList = teamService.listTeams(teamQueryRequest,request,false);
-
-        // 判断当前用户是否已加入队伍
-        List<Long> teamIdList = resultList.stream().map(TeamUserVO::getId).collect(Collectors.toList());
-        // 如果用户未登录 未加入
         Page<TeamUserVO> teamUserVOPage = new Page<TeamUserVO>(teamQueryRequest.getCurrent(), teamQueryRequest.getPageSize());
-        try {
-            User loginUser = userService.getLoginUser(request);
-            QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
-            userTeamQueryWrapper.in("teamId",teamIdList);
-            userTeamQueryWrapper.eq("userId",loginUser.getId());
-            List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
-            // 已加入队伍的 id 集合
-            Set<Long> hasJoinTeamSet = userTeamList.stream().map(UserTeam::getTeamId).collect(Collectors.toSet());
-            resultList.stream().forEach(teamUserVO -> {
-                boolean isContains = hasJoinTeamSet.contains(teamUserVO.getId());
-                teamUserVO.setHasJoin(isContains);
-            });
-        } catch (Exception e) {// 如果未登录不抛出异常
-        }
-        // 3、查询已加入队伍的人数
-        QueryWrapper<UserTeam> userTeamJoinQueryWrapper = new QueryWrapper<>();
-        userTeamJoinQueryWrapper.in("teamId", teamIdList);
-        List<UserTeam> userTeamList = userTeamService.list(userTeamJoinQueryWrapper);
-        // 队伍 id => 加入这个队伍的用户列表
-        Map<Long, List<UserTeam>> teamIdUserTeamList = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
-        resultList.forEach(team -> team.setHasJoinNum(teamIdUserTeamList.getOrDefault(team.getId(), new ArrayList<>()).size()));
+        resultList = teamService.getResultTeamVOList(resultList,request);
+
+
         teamUserVOPage.setRecords(resultList);
         return ResultUtils.success(teamUserVOPage);
     }
@@ -231,6 +209,7 @@ public class TeamController {
         teamQueryRequest.setIdList(idList);
         List<TeamUserVO> resultList = teamService.listTeams(teamQueryRequest,request,true);
         Page<TeamUserVO> resultPage = new Page<>(teamQueryRequest.getCurrent(),teamQueryRequest.getPageSize());
+        resultList = teamService.getResultTeamVOList(resultList,request);
         resultPage.setRecords(resultList);
         return ResultUtils.success(resultPage);
     }
@@ -257,6 +236,7 @@ public class TeamController {
         teamQueryRequest.setIdList(idList);
         List<TeamUserVO> resultList = teamService.listTeams(teamQueryRequest,request,true);
         Page<TeamUserVO> resultPage = new Page<>(teamQueryRequest.getCurrent(),teamQueryRequest.getPageSize());
+        resultList = teamService.getResultTeamVOList(resultList,request);
         resultPage.setRecords(resultList);
         return ResultUtils.success(resultPage);
     }

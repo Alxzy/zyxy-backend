@@ -70,4 +70,14 @@ public class TeamUserVO implements Serializable {
      */
     private Boolean hasJoin = false;
 
+    /**
+     * 创建人姓名
+     */
+    private String createUsername;
+
+    /**
+     * 创建人姓名
+     */
+    private String createAvatarUrl;
+
 }

@@ -28,6 +28,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.zy.zyxy.contant.TeamConstant.DEFAULT_MAX_TEAM_NUM;
 import static com.zy.zyxy.contant.TeamConstant.USER_JOIN_TEAM_TEAM_KEY;
@@ -141,6 +142,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>(team);
         List<Long> idList = teamQueryRequest.getIdList();
+
         if (isMe && CollectionUtils.isNotEmpty(idList)) {
             queryWrapper.in("id", idList);
         }
@@ -337,6 +339,39 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         // 删除队伍
         return this.removeById(teamId);
+    }
+
+    @Override
+    public List<TeamUserVO> getResultTeamVOList(List<TeamUserVO> resultList,HttpServletRequest request) {
+        // 1.判断当前用户是否已加入队伍
+        List<Long> teamIdList = resultList.stream().map(TeamUserVO::getId).collect(Collectors.toList());
+        // 1.1 如果用户未登录 未加入
+        try {
+            User loginUser = userService.getLoginUser(request);
+            QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+            userTeamQueryWrapper.in("teamId",teamIdList);
+            userTeamQueryWrapper.eq("userId",loginUser.getId());
+            List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+            // 已加入队伍的 id 集合
+            Set<Long> hasJoinTeamSet = userTeamList.stream().map(UserTeam::getTeamId).collect(Collectors.toSet());
+            resultList.stream().forEach(teamUserVO -> {
+                boolean isContains = hasJoinTeamSet.contains(teamUserVO.getId());
+                teamUserVO.setHasJoin(isContains);
+            });
+        } catch (Exception e) {// 如果未登录不抛出异常
+        }
+        // 2、查询已加入队伍的人数
+        QueryWrapper<UserTeam> userTeamJoinQueryWrapper = new QueryWrapper<>();
+        userTeamJoinQueryWrapper.in("teamId", teamIdList);
+        List<UserTeam> userTeamList = userTeamService.list(userTeamJoinQueryWrapper);
+        // 队伍 id => 加入这个队伍的用户列表
+        Map<Long, List<UserTeam>> teamIdUserTeamList = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
+        resultList.forEach(team -> {
+            team.setHasJoinNum(teamIdUserTeamList.getOrDefault(team.getId(), new ArrayList<>()).size());
+            team.setCreateAvatarUrl(team.getCreateUserVO().getAvatarUrl());
+            team.setCreateUsername(team.getCreateUserVO().getUsername());
+        });
+        return resultList;
     }
 
     private Team isExistTeam(Long teamId) {

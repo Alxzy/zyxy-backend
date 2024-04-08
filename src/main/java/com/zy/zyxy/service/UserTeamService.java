@@ -12,4 +12,18 @@ import com.baomidou.mybatisplus.extension.service.IService;
 */
 public interface UserTeamService extends IService<UserTeam> {
 
+    /**
+     * 获取对应队伍已加入的用户数量
+     * @param teamId
+     * @return
+     */
+    Integer getTeamHasJoinUserNum(Long teamId);
+
+    /**
+     * 当前用户是否在队伍中
+     * @param teamId
+     * @param userId
+     * @return
+     */
+    Boolean isUserInTeam(Long teamId,Long userId);
 }
