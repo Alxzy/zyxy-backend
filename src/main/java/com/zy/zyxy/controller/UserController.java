@@ -101,6 +101,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/logout")
+    @AuthCheck(anyRole = {"admin","user","vip"})
     public BaseResponse<Integer> userLogout(HttpServletRequest request) {
         if (request == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -116,6 +117,7 @@ public class UserController {
      * @return
      */
     @GetMapping("/current")
+    @AuthCheck(anyRole = {"admin","user","vip"})
     public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         User currentUser = (User) userObj;
@@ -131,6 +133,7 @@ public class UserController {
 
 
     @GetMapping("/search")
+    @AuthCheck(mustRole = "admin")
     public BaseResponse<List<User>> searchUsers(String username, HttpServletRequest request) {
         if (!userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH, "缺少管理员权限");
@@ -147,6 +150,7 @@ public class UserController {
 
 
     @PostMapping("/delete")
+    @AuthCheck(mustRole = "admin")
     public BaseResponse<Boolean> deleteUser(@RequestBody long id, HttpServletRequest request) {
         if (!userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH);
@@ -214,8 +218,8 @@ public class UserController {
 
         // 分页
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-//        List<User> userList = userService.list(queryWrapper);
-
+        // 普通匹配 可以查看到其他分组的用户
+//        queryWrapper.eq("planetCode",loginUser.getPlanetCode());
         if(current == null){
             current = 1l;
         }
