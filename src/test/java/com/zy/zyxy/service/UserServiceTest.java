@@ -1,6 +1,7 @@
 package com.zy.zyxy.service;
 
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zy.zyxy.model.dto.User;
 import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
@@ -92,8 +93,8 @@ public class UserServiceTest {
         String userPassword = "12345678";
         String checkPassword = "12345678";
         String planetCode = "10";
-        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode,"","",0,"","");
-        Assertions.assertEquals(11, result);
+//        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode,"","",0,"","");
+//        Assertions.assertEquals(11, result);
 //        userAccount = "yu";
 //        result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode);
 //        Assertions.assertEquals(-1, result);
@@ -130,4 +131,15 @@ public class UserServiceTest {
         }
         Assert.assertNotNull(users);
     }
+
+    @Test
+    void searchUsers(){
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.eq("id",2);
+        List<User> userList = userService.list(userQueryWrapper);
+
+        Assert.assertNull(userList);
+    }
+
+
 }

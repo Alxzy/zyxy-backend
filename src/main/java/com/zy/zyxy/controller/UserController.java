@@ -34,7 +34,7 @@ import static com.zy.zyxy.contant.UserConstant.*;
  */
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = {"http://localhost:5173/"},allowCredentials = "true")
+@CrossOrigin(origins = {"http://127.0.0.1:5173/","https://zyxy.ai-haitham-gsim.icu","https://zyxy-back.ai-haitham-gsim.icu"},allowCredentials = "true")
 @Slf4j
 public class UserController {
 
@@ -226,6 +226,7 @@ public class UserController {
         if(pagesize == null){
             pagesize = 15l;
         }
+        queryWrapper.orderByDesc("id");
         userPage = userService.page(new Page<>(current, pagesize), queryWrapper);
         // 修改为安全用户
         List<User> list = userPage.getRecords().stream().map(user -> userService.getSafetyUser(user)).collect(Collectors.toList());

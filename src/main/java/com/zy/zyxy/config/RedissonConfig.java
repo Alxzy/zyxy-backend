@@ -24,7 +24,7 @@ public class RedissonConfig {
     String port;
     // 数据库号 这里不使用是因为 原来那个库 是用于缓存数据的
     // 分布式锁 属于另一个功能,因此这里分到另外一个库中
-//    private String database;
+    private String password;
 
 
     @Bean
@@ -34,7 +34,7 @@ public class RedissonConfig {
         // 地址最好不要写死
         String redisAddress = String.format("redis://%s:%s", host, port);
         // 地址 密码 库 没有开集群就使用单机
-        config.useSingleServer().setAddress(redisAddress).setDatabase(3);;
+        config.useSingleServer().setAddress(redisAddress).setDatabase(3).setPassword(password);
 
         // 2. 创建 Redisson实例
         RedissonClient redisson = Redisson.create(config);

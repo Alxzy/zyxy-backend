@@ -7,6 +7,7 @@ import org.springframework.util.StopWatch;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -37,20 +38,30 @@ public class InsertUsersTest {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         List<User> userList = new ArrayList<>();
+        ArrayList<String> planetList = new ArrayList<>();
+        planetList.add("阅读");
+        planetList.add("打游戏");
+        planetList.add("美食");
+        planetList.add("编程学习");
+        planetList.add("旅行");
+        planetList.add("运动");
+        planetList.add("音乐");
+        planetList.add("演出");
         for(int i = 0;i < INSERT_NUM;i++){
             User user = new User();
             user.setUsername("fakeUser");
-            user.setUserAccount("fakezyzy");
-            user.setAvatarUrl("https://img0.baidu.com/it/u=1150065970,2999223123&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500");
+            user.setUserAccount("fakezyzy" + i);
+            user.setAvatarUrl("https://img1.baidu.com/it/u=3333815031,2954843873&fm=253&fmt=auto&app=138&f=JPEG?w=507&h=500");
             user.setGender(1);
             user.setUserPassword("12345678");
             user.setPhone("123321");
             user.setEmail("123321@qq.com");
             user.setUserStatus(0);
             user.setUserRole(0);
-            user.setPlanetCode("1111111");
-            user.setTags("[]");
-            user.setProfile("hello！！！");
+            String planetCode = planetList.get(i % 8);
+            user.setPlanetCode(planetCode);
+            user.setTags("[" + planetCode  + "]");
+            user.setProfile("你好，我是练习时长两年半的个人练习生，我的爱好是 " + planetCode);
             userList.add(user);
         }
         // 10W条数据 批量1W saveBatch用时: 8389ms
@@ -68,16 +79,34 @@ public class InsertUsersTest {
     @Test
     public void doConcurrencyInsertUsers(){
 //        final int INSERT_NUM = 1000;
-        final int INSERT_NUM = 300000;
+        final int INSERT_NUM = 50000;
         // 记录值
         int j = 0;
         //批量插入数据的大小
-        int batchSize = 15000;
+        int batchSize = 2500;
         // 计时工具
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         // 任务列表
         List<CompletableFuture<Void>> futureList = new ArrayList<>();
+        HashMap<String,String> planetMap = new HashMap<>();
+        ArrayList<String> planetCodeList = new ArrayList<>();
+        planetCodeList.add("阅读");
+        planetCodeList.add("打游戏");
+        planetCodeList.add("美食");
+        planetCodeList.add("编程学习");
+        planetCodeList.add("旅行");
+        planetCodeList.add("运动");
+        planetCodeList.add("音乐");
+        planetCodeList.add("演出");
+        planetMap.put("阅读","[\"阅读\"]");
+        planetMap.put("打游戏","[\"打游戏\"]");
+        planetMap.put("美食","[\"美食\"]");
+        planetMap.put("编程学习","[\"编程学习\"]");
+        planetMap.put("旅行","[\"旅行\"]");
+        planetMap.put("运动","[\"运动\"]");
+        planetMap.put("音乐","[\"音乐\"]");
+        planetMap.put("演出","[\"演出\"]");
         // 外层循环变量 组数
         for(int i = 0;i < 20;i++){
             List<User> userList = new ArrayList<>();
@@ -85,17 +114,18 @@ public class InsertUsersTest {
                 j++;
                 User user = new User();
                 user.setUsername("fakeUser");
-                user.setUserAccount("fakezyzy");
-                user.setAvatarUrl("https://img0.baidu.com/it/u=1150065970,2999223123&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500");
+                user.setUserAccount("fakeuser");
+                user.setAvatarUrl("https://img1.baidu.com/it/u=3333815031,2954843873&fm=253&fmt=auto&app=138&f=JPEG?w=507&h=500");
                 user.setGender(1);
                 user.setUserPassword("12345678");
                 user.setPhone("123321");
                 user.setEmail("123321@qq.com");
                 user.setUserStatus(0);
                 user.setUserRole(0);
-                user.setPlanetCode("1111111");
-                user.setTags("[]");
-                user.setProfile("hello！！！");
+                String planetCode = planetCodeList.get(j % 8);
+                user.setPlanetCode(planetCode);
+                user.setTags(planetMap.get(planetCode));
+                user.setProfile("你好，我是练习时长两年半的个人练习生，我的爱好是 " + planetCode);
                 userList.add(user);
                 if(j % batchSize == 0){
                     // 完成一批退出

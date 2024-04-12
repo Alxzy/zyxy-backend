@@ -42,7 +42,7 @@ import static com.zy.zyxy.contant.TagConstant.TAG_LIST_KEY;
  */
 @RestController
 @RequestMapping("/invitation")
-@CrossOrigin(origins = {"http://localhost:5173/"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://127.0.0.1:5173/","https://zyxy.ai-haitham-gsim.icu","https://zyxy-back.ai-haitham-gsim.icu"},allowCredentials = "true")
 @Slf4j
 public class InvitationController {
     @Resource

@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/team")
-@CrossOrigin(origins = {"http://localhost:5173/"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://127.0.0.1:5173/","https://zyxy.ai-haitham-gsim.icu","https://zyxy-back.ai-haitham-gsim.icu"},allowCredentials = "true")
 @Slf4j
 public class TeamController {
 

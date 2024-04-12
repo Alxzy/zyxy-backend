@@ -292,6 +292,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 3.3 再次查询补充完整信息并分页
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("id",idList);
+        queryWrapper.orderByDesc("id");
         Page<User> userPage = this.page(new Page<>(1, num), queryWrapper);
         Map<Long, List<User>> userListMap = userPage.getRecords().stream()
                 .map(user -> this.getSafetyUser(user))
